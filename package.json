@@ -1,0 +1,20 @@
+{
+  "name": "discord-music-player",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lkh1892/Discord-music-player.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lkh1892/Discord-music-player/issues"
+  },
+  "homepage": "https://github.com/lkh1892/Discord-music-player#readme"
+}
