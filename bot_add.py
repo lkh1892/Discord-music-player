@@ -3,6 +3,7 @@ import asyncio
 import datetime
 import json
 import discord
+from discord import File
 from discord.ext import commands
 from discord.ui import Button, View
 from discord import app_commands  # 슬래시 명령어를 위한 임포트
@@ -390,6 +391,7 @@ class MusicPlayer:
             source.cleanup()
             self.current = None
             
+            
     async def destroy(self, guild):
         """플레이어 정리 및 종료"""
         return self.bot.loop.create_task(self.cog.cleanup(guild))
@@ -483,7 +485,7 @@ class Music(commands.Cog):
         
         # 새 컨트롤러 임베드 생성
         embed = discord.Embed(
-            title="🎮 음악 컨트롤러",
+            title="🎤 콩인 노래방에 오신 것을 환영합니다!",
             description="아래 버튼을 사용하여 음악을 제어할 수 있습니다.\n이 채널에 노래 제목만 입력해도 자동으로 재생됩니다!",
             color=discord.Color.blue()
         )
