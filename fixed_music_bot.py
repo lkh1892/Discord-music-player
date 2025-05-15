@@ -122,6 +122,7 @@ class MusicControlButtons(View):
         
         # 중요: 수동으로 next 이벤트 설정
         server_queue.next.set()
+        interaction.guild.voice_client.resume()
         
         # 이벤트 상태 로그
         print(f"스킵 후 next 이벤트 상태: {server_queue.next.is_set()}")
@@ -1139,6 +1140,7 @@ class Music(commands.Cog):
                 
                 # 수동으로 next 이벤트 설정
                 server_queue.next.set()
+                interaction.guild.voice_client.resume()
                 
                 print(f"스킵 후 next 이벤트 상태: {server_queue.next.is_set()}")
                 
