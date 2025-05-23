@@ -840,7 +840,7 @@ class Music(commands.Cog):
     @commands.command(name='스킵', aliases=['skip', 's'])
     async def skip(self, ctx):
         """현재 재생 중인 노래를 건너뜁니다."""
-        if not ctx.voice_client or not ctx.voice_client.is_playing():
+        if not ctx.voice_client:
             return await ctx.send("❌ 재생 중인 노래가 없습니다!")
             
         if not ctx.author.voice or ctx.author.voice.channel != ctx.voice_client.channel:
