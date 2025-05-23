@@ -32,8 +32,7 @@ ytdl_format_options = {
 }
 
 ffmpeg_options = {
-    'options': '-vn',
-    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+    'options': '-vn'
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
@@ -304,22 +303,37 @@ class YTDLSource(discord.PCMVolumeTransformer):
                 # 다운로드 모드에서는 파일명 사용
                 filename = ytdl.prepare_filename(data)
             
-            # FFmpeg 오류 처리 개선
+            # FFmpeg 오류 처리 개선 - 단계별 시도
             try:
+                # 1단계: 기본 옵션만 사용
                 source = discord.FFmpegPCMAudio(
                     filename, 
                     executable=FFMPEG_PATH,
-                    **ffmpeg_options
+                    options='-vn'
                 )
                 return cls(source, data=data)
-            except Exception as e:
-                print(f"FFmpeg 오디오 처리 중 오류: {e}")
-                raise
+            except Exception as e1:
+                print(f"1단계 FFmpeg 실패: {e1}")
+                try:
+                    # 2단계: executable 없이 시도
+                    source = discord.FFmpegPCMAudio(
+                        filename,
+                        options='-vn'
+                    )
+                    return cls(source, data=data)
+                except Exception as e2:
+                    print(f"2단계 FFmpeg 실패: {e2}")
+                    try:
+                        # 3단계: 아무 옵션 없이 시도
+                        source = discord.FFmpegPCMAudio(filename)
+                        return cls(source, data=data)
+                    except Exception as e3:
+                        print(f"3단계 FFmpeg 실패: {e3}")
+                        raise Exception(f"FFmpeg 오디오 처리 실패: {e3}")
                 
         except Exception as e:
             print(f"음악 로드 중 오류: {e}")
             raise Exception(f"이 영상을 로드할 수 없습니다: {e}")
-
 # 음악 큐 관리를 위한 클래스
 class MusicPlayer:
     def __init__(self, ctx, cog=None):
@@ -336,7 +350,8 @@ class MusicPlayer:
         self.repeat_mode = REPEAT_MODE["NONE"]  # 추가: 반복 모드 설정
         
         ctx.bot.loop.create_task(self.player_loop())
-        
+    
+       
     async def player_loop(self):
         """음악 재생 루프"""
         await self.bot.wait_until_ready()
@@ -368,11 +383,17 @@ class MusicPlayer:
                 def after_playing(error):
                     if error:
                         print(f"재생 후 오류 발생: {error}")
-                        # 오류 세부 정보 출력
                         import traceback
                         traceback.print_exc()
-                    # 명시적으로 next 이벤트 설정
-                    self.bot.loop.call_soon_threadsafe(self.next.set)
+                    try:
+                        # 안전한 방식으로 next 이벤트 설정
+                        if not self.bot.is_closed():
+                            self.bot.loop.call_soon_threadsafe(self.next.set)
+                    except Exception as e:
+                        print(f"Next 이벤트 설정 중 오류: {e}")
+                        # 수동으로 이벤트 설정
+                        asyncio.create_task(self._set_next_event())
+
                 
                 # 노래 재생
                 self.guild.voice_client.play(source, after=after_playing)
