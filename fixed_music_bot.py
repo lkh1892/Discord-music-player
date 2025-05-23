@@ -31,15 +31,16 @@ ytdl_format_options = {
     'no_cache_dir': False,       # 캐시 사용 활성화
 }
 
-ffmpeg_options = {
-    'options': '-vn'
-}
+# FFmpeg 옵션 완전히 제거 - 이것이 문제의 원인
+# ffmpeg_options는 사용하지 않고 직접 지정
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
 # .env 파일에서 환경 변수 로드
 load_dotenv()
+# TOKEN = 'dcd29f54dfd3338013b1f2b7ab7e8149694b9e7187dbf377bad75ad30137ec06'
 TOKEN = os.getenv('DISCORD_TOKEN')
+
 
 # 봇 설정
 intents = discord.Intents.default()
@@ -49,7 +50,7 @@ intents.voice_states = True
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
 # FFMPEG 경로 설정 (실제 경로로 변경 필요)
-FFMPEG_PATH = r"C:/ffmpeg/bin/ffmpeg.exe"  # 여러분의 ffmpeg.exe 경로로 변경하세요
+FFMPEG_PATH = r"C:\ffmpeg\bin\ffmpeg.exe"  # 여러분의 ffmpeg.exe 경로로 변경하세요
 
 # 반복 재생 모드 설정
 REPEAT_MODE = {
@@ -121,7 +122,6 @@ class MusicControlButtons(View):
         
         # 중요: 수동으로 next 이벤트 설정
         server_queue.next.set()
-        interaction.guild.voice_client.resume()
         
         # 이벤트 상태 로그
         print(f"스킵 후 next 이벤트 상태: {server_queue.next.is_set()}")
@@ -276,7 +276,7 @@ class MusicControlButtons(View):
             
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# 유튜브 검색 및 재생을 위한 클래스
+# 유튜브 검색 및 재생을 위한 클래스 - 완전히 수정된 버전
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
@@ -303,37 +303,47 @@ class YTDLSource(discord.PCMVolumeTransformer):
                 # 다운로드 모드에서는 파일명 사용
                 filename = ytdl.prepare_filename(data)
             
-            # FFmpeg 오류 처리 개선 - 단계별 시도
+            # FFmpeg 오류 처리 - 단계적 접근
+            source = None
+            error_messages = []
+            
+            # 1단계: FFmpeg 경로와 기본 옵션 사용
             try:
-                # 1단계: 기본 옵션만 사용
                 source = discord.FFmpegPCMAudio(
                     filename, 
-                    executable=FFMPEG_PATH,
-                    options='-vn'
+                    executable=FFMPEG_PATH
                 )
-                return cls(source, data=data)
+                print("FFmpeg 1단계 성공: 경로 + 기본 설정")
             except Exception as e1:
-                print(f"1단계 FFmpeg 실패: {e1}")
+                error_messages.append(f"1단계 실패: {e1}")
+                
+                # 2단계: 시스템 FFmpeg 사용
                 try:
-                    # 2단계: executable 없이 시도
-                    source = discord.FFmpegPCMAudio(
-                        filename,
-                        options='-vn'
-                    )
-                    return cls(source, data=data)
+                    source = discord.FFmpegPCMAudio(filename)
+                    print("FFmpeg 2단계 성공: 시스템 FFmpeg")
                 except Exception as e2:
-                    print(f"2단계 FFmpeg 실패: {e2}")
+                    error_messages.append(f"2단계 실패: {e2}")
+                    
+                    # 3단계: 다른 옵션들 시도
                     try:
-                        # 3단계: 아무 옵션 없이 시도
-                        source = discord.FFmpegPCMAudio(filename)
-                        return cls(source, data=data)
+                        source = discord.FFmpegOpusAudio(filename)
+                        print("FFmpeg 3단계 성공: Opus 오디오")
                     except Exception as e3:
-                        print(f"3단계 FFmpeg 실패: {e3}")
-                        raise Exception(f"FFmpeg 오디오 처리 실패: {e3}")
+                        error_messages.append(f"3단계 실패: {e3}")
+                        
+                        # 모든 방법 실패
+                        full_error = " | ".join(error_messages)
+                        raise Exception(f"모든 FFmpeg 옵션 실패: {full_error}")
+            
+            if source is None:
+                raise Exception("FFmpeg 소스 생성 실패")
+                
+            return cls(source, data=data)
                 
         except Exception as e:
             print(f"음악 로드 중 오류: {e}")
             raise Exception(f"이 영상을 로드할 수 없습니다: {e}")
+
 # 음악 큐 관리를 위한 클래스
 class MusicPlayer:
     def __init__(self, ctx, cog=None):
@@ -350,8 +360,7 @@ class MusicPlayer:
         self.repeat_mode = REPEAT_MODE["NONE"]  # 추가: 반복 모드 설정
         
         ctx.bot.loop.create_task(self.player_loop())
-    
-       
+        
     async def player_loop(self):
         """음악 재생 루프"""
         await self.bot.wait_until_ready()
@@ -379,21 +388,19 @@ class MusicPlayer:
             self.current = source
             
             try:
-                # after 콜백 함수 정의
+                # after 콜백 함수 정의 - 안전하게 수정
                 def after_playing(error):
                     if error:
                         print(f"재생 후 오류 발생: {error}")
-                        import traceback
-                        traceback.print_exc()
                     try:
                         # 안전한 방식으로 next 이벤트 설정
                         if not self.bot.is_closed():
-                            self.bot.loop.call_soon_threadsafe(self.next.set)
+                            asyncio.run_coroutine_threadsafe(
+                                self._safe_set_next(), 
+                                self.bot.loop
+                            )
                     except Exception as e:
                         print(f"Next 이벤트 설정 중 오류: {e}")
-                        # 수동으로 이벤트 설정
-                        asyncio.create_task(self._set_next_event())
-
                 
                 # 노래 재생
                 self.guild.voice_client.play(source, after=after_playing)
@@ -460,7 +467,13 @@ class MusicPlayer:
             # 다음 노래를 위해 현재 소스 정리
             source.cleanup()
             self.current = None
-            
+    
+    async def _safe_set_next(self):
+        """안전하게 next 이벤트를 설정하는 메서드"""
+        try:
+            self.next.set()
+        except Exception as e:
+            print(f"Safe set next 오류: {e}")
             
     async def destroy(self, guild):
         """플레이어 정리 및 종료"""
@@ -1161,7 +1174,6 @@ class Music(commands.Cog):
                 
                 # 수동으로 next 이벤트 설정
                 server_queue.next.set()
-                interaction.guild.voice_client.resume()
                 
                 print(f"스킵 후 next 이벤트 상태: {server_queue.next.is_set()}")
                 
