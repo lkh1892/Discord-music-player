@@ -31,8 +31,15 @@ ytdl_format_options = {
     'no_cache_dir': False,       # 캐시 사용 활성화
 }
 
+<<<<<<< HEAD
 # FFmpeg 옵션 완전히 제거 - 이것이 문제의 원인
 # ffmpeg_options는 사용하지 않고 직접 지정
+=======
+ffmpeg_options = {
+    'options': '-vn',
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+}
+>>>>>>> parent of 4211c77 (Update fixed_music_bot.py)
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
@@ -303,6 +310,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
                 # 다운로드 모드에서는 파일명 사용
                 filename = ytdl.prepare_filename(data)
             
+<<<<<<< HEAD
             # FFmpeg 오류 처리 - 단계적 접근
             source = None
             error_messages = []
@@ -339,6 +347,19 @@ class YTDLSource(discord.PCMVolumeTransformer):
                 raise Exception("FFmpeg 소스 생성 실패")
                 
             return cls(source, data=data)
+=======
+            # FFmpeg 오류 처리 개선
+            try:
+                source = discord.FFmpegPCMAudio(
+                    filename, 
+                    executable=FFMPEG_PATH,
+                    **ffmpeg_options
+                )
+                return cls(source, data=data)
+            except Exception as e:
+                print(f"FFmpeg 오디오 처리 중 오류: {e}")
+                raise
+>>>>>>> parent of 4211c77 (Update fixed_music_bot.py)
                 
         except Exception as e:
             print(f"음악 로드 중 오류: {e}")
@@ -392,6 +413,7 @@ class MusicPlayer:
                 def after_playing(error):
                     if error:
                         print(f"재생 후 오류 발생: {error}")
+<<<<<<< HEAD
                     try:
                         # 안전한 방식으로 next 이벤트 설정
                         if not self.bot.is_closed():
@@ -401,6 +423,13 @@ class MusicPlayer:
                             )
                     except Exception as e:
                         print(f"Next 이벤트 설정 중 오류: {e}")
+=======
+                        # 오류 세부 정보 출력
+                        import traceback
+                        traceback.print_exc()
+                    # 명시적으로 next 이벤트 설정
+                    self.bot.loop.call_soon_threadsafe(self.next.set)
+>>>>>>> parent of 4211c77 (Update fixed_music_bot.py)
                 
                 # 노래 재생
                 self.guild.voice_client.play(source, after=after_playing)
