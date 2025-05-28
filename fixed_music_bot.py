@@ -1605,29 +1605,14 @@ async def on_message(message):
                         asyncio.create_task(music_cog.delete_messages_after(5, message, error_msg))
                         return
         
-        # 슬래시 명령어나 일반 명령어는 처리 후 바로 리턴
+        # 명령어 처리 (! 또는 / 로 시작하는 메시지)
         if message.content.startswith('!') or message.content.startswith('/'):
             await bot.process_commands(message)
             return
         
-        # 짧은 메시지 (1-2단어) 또는 짧은 단일 단어는 명령어로 처리
-        words = message.content.split()
-        if len(words) < 2 and len(message.content) < 10:
-            await bot.process_commands(message)
-            return
-        
-        # 음성 채널에 있는 사용자만 메시지로 노래 요청 가능
-        if message.author.voice and message.author.voice.channel:
-            # 재생 명령어와 같은 기능으로 처리
-            ctx = await bot.get_context(message)
-            music_cog = bot.get_cog('Music')
-            if music_cog:
-                # 비동기 처리로 변경하여 봇의 응답성 유지
-                asyncio.create_task(music_cog.play(ctx, search=message.content))
-                return
-        
-        # 일반 메시지로 처리
+        # 나머지 모든 일반 메시지는 그냥 명령어 처리만 하고 끝
         await bot.process_commands(message)
+        
     except Exception as e:
         print(f"메시지 처리 중 오류 발생: {e}")
         # 오류가 발생해도 기본 명령어 처리는 시도
